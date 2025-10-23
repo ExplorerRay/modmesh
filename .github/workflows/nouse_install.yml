@@ -3,8 +3,7 @@ name: nouse_install
 on:
   push:
   pull_request:
-  schedule:
-    - cron: '34 17 * * *'
+  workflow_dispatch:
 
 jobs:
 
@@ -91,7 +90,7 @@ jobs:
         python3 -c "import _modmesh; print(_modmesh.__file__)"
         # The following command is the original commend, and it will fail on pytest == 8.0.0 .
         # pytest --rootdir=/tmp -v
-        # Here is the issue and temporary solution: https://github.com/pytest-dev/pytest/issues/11781  
+        # Here is the issue and temporary solution: https://github.com/pytest-dev/pytest/issues/11781
         # The alternative command to solve the issue is ```pytest --rootdir=. -v```.
         pytest --rootdir=. -v
         cd ..
@@ -183,7 +182,7 @@ jobs:
           python3 -c "import _modmesh; print(_modmesh.__file__)"
           # The following command is the original commend, and it will fail on pytest == 8.0.0 .
           # pytest --rootdir=/tmp -v
-          # Here is the issue and temporary solution: https://github.com/pytest-dev/pytest/issues/11781  
+          # Here is the issue and temporary solution: https://github.com/pytest-dev/pytest/issues/11781
           # The alternative command to solve the issue is ```pytest --rootdir=. -v``` .
           pytest --rootdir=. -v
           cd ..
