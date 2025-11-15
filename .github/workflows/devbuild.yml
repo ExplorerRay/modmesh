@@ -197,12 +197,19 @@ jobs:
     #     key: ${{ runner.os }}-${{ matrix.cmake_build_type }}
     #     restore-keys: ${{ runner.os }}-${{ matrix.cmake_build_type }}
     #     create-symlink: true
-    - name: Restore build path cache
-      id: cache-build-restore
-      uses: actions/cache/restore@v4
+    - name: Get date in ISO format
+      id: get-date
+      run: |
+        echo "date=$(/bin/date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Cache build path
+      id: cache-build
+      uses: actions/cache@v4
       with:
         path: build/
-        key: ${{ runner.os }}-${{ matrix.cmake_build_type }}
+        key: cache-${{ runner.os }}-${{ matrix.cmake_build_type }}-${{ steps.get-date.outputs.date }}
+        restore-keys: cache-${{ runner.os }}-${{ matrix.cmake_build_type }}
 
     - name: make gtest BUILD_QT=OFF
       run: |
@@ -391,9 +398,9 @@ jobs:
       #     key: ${{ runner.os }}-${{ matrix.cmake_build_type }}
       #     restore-keys: ${{ runner.os }}-${{ matrix.cmake_build_type }}
       #     create-symlink: true
-      - name: Restore build path cache
-        id: cache-build-restore
-        uses: actions/cache/restore@v4
+      - name: Cache build path
+        id: cache-build
+        uses: actions/cache@v4
         with:
           path: build/
           key: ${{ runner.os }}-${{ matrix.cmake_build_type }}
@@ -490,13 +497,6 @@ jobs:
             CMAKE_ARGS="-DPYTHON_EXECUTABLE=$(which python3) -DUSE_SANITIZER=OFF -DUSE_PYTEST_HELPER_BINDING=ON"
           make buildext VERBOSE=1
           make pytest VERBOSE=1
-
-      - name: Save build path cache
-        id: cache-build-save
-        uses: actions/cache/save@v4
-        with:
-          path: build/
-          key: ${{ steps.cache-build-restore.outputs.cache-primary-key }}
 
   build_windows:
 
