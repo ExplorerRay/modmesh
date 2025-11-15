@@ -86,6 +86,107 @@ class ConcreteBufferBasicTC(unittest.TestCase):
         self.assertTrue((ndarr == 0).all())
 
 
+class ConcreteBufferAlignmentTC(unittest.TestCase):
+    """
+    Test memory alignment support for ConcreteBuffer.
+    Valid alignment values are: 0 (default, no alignment), 16, 32, or 64 bytes.
+    """
+
+    def test_default_alignment(self):
+        buffer = modmesh.ConcreteBuffer(256)  # default alignment 0
+        self.assertEqual(0, buffer.alignment)
+        self.assertEqual(256, buffer.nbytes)
+
+    def test_alignment_creation(self):
+        buffer = modmesh.ConcreteBuffer(256, 16)
+        self.assertEqual(16, buffer.alignment)
+        self.assertEqual(256, buffer.nbytes)
+
+        buffer = modmesh.ConcreteBuffer(512, 32)
+        self.assertEqual(32, buffer.alignment)
+        self.assertEqual(512, buffer.nbytes)
+
+        buffer = modmesh.ConcreteBuffer(1024, 64)
+        self.assertEqual(64, buffer.alignment)
+        self.assertEqual(1024, buffer.nbytes)
+
+    def test_alignment_validation_valid_values(self):
+        modmesh.ConcreteBuffer(256, 16)
+        modmesh.ConcreteBuffer(512, 32)
+        modmesh.ConcreteBuffer(1024, 64)
+
+    def test_alignment_validation_invalid_values(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::ConcreteBuffer: alignment must be 0, 16, 32, or 64, but got 17"  # noqa E501
+        ):
+            modmesh.ConcreteBuffer(256, 17)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::ConcreteBuffer: alignment must be 0, 16, 32, or 64, but got 100"  # noqa E501
+        ):
+            modmesh.ConcreteBuffer(256, 100)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::ConcreteBuffer: alignment must be 0, 16, 32, or 64, but got 128"  # noqa E501
+        ):
+            modmesh.ConcreteBuffer(1024, 128)
+
+    def test_alignment_size_validation(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 64"  # noqa E501
+        ):
+            modmesh.ConcreteBuffer(5, 64)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 16"  # noqa E501
+        ):
+            modmesh.ConcreteBuffer(100, 16)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 32"  # noqa E501
+        ):
+            modmesh.ConcreteBuffer(200, 32)
+
+    def test_alignment_with_zero_size(self):
+        buffer = modmesh.ConcreteBuffer(0, 0)
+        self.assertEqual(0, buffer.alignment)
+        self.assertEqual(0, buffer.nbytes)
+
+        buffer = modmesh.ConcreteBuffer(0, 16)
+        self.assertEqual(16, buffer.alignment)
+        self.assertEqual(0, buffer.nbytes)
+
+    def test_alignment_with_ndarray(self):
+        buffer = modmesh.ConcreteBuffer(256, 16)
+        self.assertEqual(16, buffer.alignment)
+
+        ndarr = buffer.ndarray
+        self.assertEqual(256, ndarr.nbytes)
+
+        buffer[0] = 42
+        self.assertEqual(42, ndarr[0])
+
+    def test_alignment_with_clone(self):
+        buffer = modmesh.ConcreteBuffer(256, 32)
+        for it in range(len(buffer)):
+            buffer[it] = it % 128
+
+        cloned = buffer.clone()
+        self.assertEqual(32, cloned.alignment)
+        self.assertEqual(256, cloned.nbytes)
+        self.assertEqual(list(buffer), list(cloned))
+
+        buffer[0] = 99
+        self.assertEqual(99, buffer[0])
+        self.assertEqual(0, cloned[0])
+
+
 class BufferExpanderBasicTC(unittest.TestCase):
 
     def test_BufferExpander(self):
@@ -886,8 +987,8 @@ class SimpleArrayBasicTC(unittest.TestCase):
             [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
             [10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
             [1, 5, 10, 2, 6, 9, 7, 8, 4, 3],
-            [1,  0,  1, -3, -4, -1,  1,  9,  5, -4],
-            [-1.3, -4.8,  1.5,  0.3,  7.1,  2.5,  4.8, -0.1,  9.4,  7.6]
+            [1, 0, 1, -3, -4, -1, 1, 9, 5, -4],
+            [-1.3, -4.8, 1.5, 0.3, 7.1, 2.5, 4.8, -0.1, 9.4, 7.6]
         ]
 
         def _check(arr, use_float=False):
@@ -969,6 +1070,400 @@ class SimpleArrayBasicTC(unittest.TestCase):
             ret_arr = data_arr.take_along_axis_simd(idx_arr)
 
 
+class SimpleArrayAlignmentTC(unittest.TestCase):
+    """
+    Test memory alignment support for SimpleArray.
+    Valid alignment values are: 0 (default, no alignment), 16, 32, or 64 bytes.
+    Tests cover various array types (Float64, Int32, Uint64) and shapes (1D, 2D, 3D).
+    """  # noqa: E501
+
+    def test_default_alignment(self):
+        array = modmesh.SimpleArrayFloat64((2, 3, 4))  # default alignment
+        self.assertEqual(0, array.alignment)
+        self.assertEqual((2, 3, 4), array.shape)
+
+    def test_alignment_creation(self):
+        array = modmesh.SimpleArrayFloat64((4, 4), 16)
+        self.assertEqual(16, array.alignment)
+        self.assertEqual((4, 4), array.shape)
+
+        array = modmesh.SimpleArrayFloat64((8, 8), 32)
+        self.assertEqual(32, array.alignment)
+        self.assertEqual((8, 8), array.shape)
+
+        array = modmesh.SimpleArrayFloat64((16, 8), 64)
+        self.assertEqual(64, array.alignment)
+        self.assertEqual((16, 8), array.shape)
+
+    def test_alignment_with_value_initialization(self):
+        # default alignment 0
+        array = modmesh.SimpleArrayFloat64((4, 4), 3.14159)
+        self.assertEqual(0, array.alignment)
+        self.assertEqual((4, 4), array.shape)
+        self.assertEqual(3.14159, array[0, 0])
+
+        # 16-byte alignment
+        array = modmesh.SimpleArrayFloat64((4, 4), 2.71828, 16)
+        self.assertEqual(16, array.alignment)
+        self.assertEqual((4, 4), array.shape)
+        self.assertEqual(2.71828, array[0, 0])
+
+    def test_alignment_validation_valid_values(self):
+        modmesh.SimpleArrayFloat64((4, 4), 16)
+        modmesh.SimpleArrayFloat64((8, 8), 32)
+        modmesh.SimpleArrayFloat64((16, 8), 64)
+
+    def test_alignment_validation_invalid_values(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::ConcreteBuffer: alignment must be 0, 16, 32, or 64, but got 17"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((4, 4), 17)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::ConcreteBuffer: alignment must be 0, 16, 32, or 64, but got 100"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((4, 4), 100)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::ConcreteBuffer: alignment must be 0, 16, 32, or 64, but got 128"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((16, 16), 128)
+
+    def test_alignment_size_validation(self):
+        modmesh.SimpleArrayFloat64((2, 2), 32)  # 2*2*8=32, multiple of 32
+        modmesh.SimpleArrayFloat64((4, 4), 64)  # 4*4*8=128, multiple of 64
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 16"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((5, 1), 16)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 32"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((3, 5), 32)
+
+    def test_alignment_with_operations(self):
+        array1 = modmesh.SimpleArrayFloat64((4, 4), 16)
+        array2 = modmesh.SimpleArrayFloat64((4, 4), 32)
+
+        self.assertEqual(16, array1.alignment)
+        self.assertEqual(32, array2.alignment)
+
+        array1.fill(5.0)
+        array2.fill(10.0)
+
+        self.assertEqual(5.0, array1[0, 0])
+        self.assertEqual(10.0, array2[0, 0])
+
+        self.assertEqual(5.0 * 16, array1.sum())
+        self.assertEqual(10.0 * 16, array2.sum())
+
+    def test_alignment_with_ndarray_conversion(self):
+        array = modmesh.SimpleArrayFloat64((4, 4), 16)
+        self.assertEqual(16, array.alignment)
+
+        ndarr = np.array(array, copy=False)
+        self.assertEqual((4, 4), ndarr.shape)
+        self.assertEqual(np.float64, ndarr.dtype)
+
+        array[0, 0] = 42.0
+        self.assertEqual(42.0, ndarr[0, 0])
+
+    def test_alignment_with_clone(self):
+        array = modmesh.SimpleArrayFloat64((4, 4), 3.14, 32)
+        self.assertEqual(32, array.alignment)
+        self.assertEqual(3.14, array[0, 0])
+
+        cloned = array.clone()
+        self.assertEqual(32, cloned.alignment)
+        self.assertEqual((4, 4), cloned.shape)
+        self.assertEqual(3.14, cloned[0, 0])
+
+        array[0, 0] = 99.9
+        self.assertEqual(99.9, array[0, 0])
+        self.assertEqual(3.14, cloned[0, 0])
+
+    def test_alignment_int32_array(self):
+        array = modmesh.SimpleArrayInt32((8, 8), 16)
+        self.assertEqual(16, array.alignment)
+        self.assertEqual((8, 8), array.shape)
+
+        array.fill(42)
+        self.assertEqual(42, array[0, 0])
+        self.assertEqual(42 * 64, array.sum())
+
+    def test_alignment_uint64_array(self):
+        array = modmesh.SimpleArrayUint64((4, 8), 32)
+        self.assertEqual(32, array.alignment)
+        self.assertEqual((4, 8), array.shape)
+
+        array.fill(100)
+        self.assertEqual(100, array[0, 0])
+        self.assertEqual(100 * 32, array.sum())
+
+    def test_alignment_with_different_shapes(self):
+        array1d = modmesh.SimpleArrayFloat64((32,), 16)
+        self.assertEqual(16, array1d.alignment)
+        self.assertEqual((32,), array1d.shape)
+
+        array2d = modmesh.SimpleArrayFloat64((4, 8), 32)
+        self.assertEqual(32, array2d.alignment)
+        self.assertEqual((4, 8), array2d.shape)
+
+        array3d = modmesh.SimpleArrayFloat64((2, 4, 4), 64)
+        self.assertEqual(64, array3d.alignment)
+        self.assertEqual((2, 4, 4), array3d.shape)
+
+    def test_alignment_with_simd_operations(self):
+        size = 16
+        alignments = [16, 32, 64]
+
+        for alignment in alignments:
+            arr1 = modmesh.SimpleArrayFloat64((size,), alignment)
+            arr2 = modmesh.SimpleArrayFloat64((size,), alignment)
+
+            self.assertEqual(alignment, arr1.alignment)
+            self.assertEqual(alignment, arr2.alignment)
+
+            for index in range(size):
+                arr1[index] = index * 2.0
+                arr2[index] = index * 3.0
+
+            result_add = arr1.add_simd(arr2)
+            self.assertEqual(0, result_add.alignment)
+            for index in range(size):
+                expected = index * 2.0 + index * 3.0
+                self.assertAlmostEqual(expected, result_add[index])
+
+            result_sub = arr1.sub_simd(arr2)
+            self.assertEqual(0, result_sub.alignment)
+            for index in range(size):
+                expected = index * 2.0 - index * 3.0
+                self.assertAlmostEqual(expected, result_sub[index])
+
+            result_mul = arr1.mul_simd(arr2)
+            self.assertEqual(0, result_mul.alignment)
+            for index in range(size):
+                expected = index * 2.0 * index * 3.0
+                self.assertAlmostEqual(expected, result_mul[index])
+
+            result_div = arr2.div_simd(arr1)
+            self.assertEqual(0, result_div.alignment)
+            for index in range(1, size):
+                expected = index * 3.0 / (index * 2.0)
+                self.assertAlmostEqual(expected, result_div[index])
+
+    def test_alignment_with_simd_operations_multidimensional(self):
+        alignments = [16, 32, 64]
+
+        for alignment in alignments:
+            array1_2d = modmesh.SimpleArrayFloat64((4, 8), alignment)
+            array2_2d = modmesh.SimpleArrayFloat64((4, 8), alignment)
+
+            self.assertEqual(alignment, array1_2d.alignment)
+            self.assertEqual(alignment, array2_2d.alignment)
+            self.assertEqual((4, 8), array1_2d.shape)
+            self.assertEqual((4, 8), array2_2d.shape)
+
+            for i in range(4):
+                for j in range(8):
+                    array1_2d[i, j] = (i * 8 + j) * 2.0
+                    array2_2d[i, j] = (i * 8 + j) * 3.0
+
+            result_add_2d = array1_2d.add_simd(array2_2d)
+            self.assertEqual(0, result_add_2d.alignment)
+            self.assertEqual((4, 8), result_add_2d.shape)
+            for i in range(4):
+                for j in range(8):
+                    value = i * 8 + j
+                    expected = value * 2.0 + value * 3.0
+                    self.assertAlmostEqual(expected, result_add_2d[i, j])
+
+            result_sub_2d = array1_2d.sub_simd(array2_2d)
+            self.assertEqual(0, result_sub_2d.alignment)
+            self.assertEqual((4, 8), result_sub_2d.shape)
+            for i in range(4):
+                for j in range(8):
+                    value = i * 8 + j
+                    expected = value * 2.0 - value * 3.0
+                    self.assertAlmostEqual(expected, result_sub_2d[i, j])
+
+            result_mul_2d = array1_2d.mul_simd(array2_2d)
+            self.assertEqual(0, result_mul_2d.alignment)
+            self.assertEqual((4, 8), result_mul_2d.shape)
+            for i in range(4):
+                for j in range(8):
+                    value = i * 8 + j
+                    expected = value * 2.0 * value * 3.0
+                    self.assertAlmostEqual(expected, result_mul_2d[i, j])
+
+            result_div_2d = array2_2d.div_simd(array1_2d)
+            self.assertEqual(0, result_div_2d.alignment)
+            self.assertEqual((4, 8), result_div_2d.shape)
+            for i in range(4):
+                for j in range(8):
+                    value = i * 8 + j
+                    if value > 0:
+                        expected = value * 3.0 / (value * 2.0)
+                        self.assertAlmostEqual(expected, result_div_2d[i, j])
+
+            array1_3d = modmesh.SimpleArrayFloat64((2, 4, 4), alignment)
+            array2_3d = modmesh.SimpleArrayFloat64((2, 4, 4), alignment)
+
+            self.assertEqual(alignment, array1_3d.alignment)
+            self.assertEqual(alignment, array2_3d.alignment)
+            self.assertEqual((2, 4, 4), array1_3d.shape)
+            self.assertEqual((2, 4, 4), array2_3d.shape)
+
+            for i in range(2):
+                for j in range(4):
+                    for k in range(4):
+                        array1_3d[i, j, k] = (i * 16 + j * 4 + k) * 2.0
+                        array2_3d[i, j, k] = (i * 16 + j * 4 + k) * 3.0
+
+            result_add_3d = array1_3d.add_simd(array2_3d)
+            self.assertEqual(0, result_add_3d.alignment)
+            self.assertEqual((2, 4, 4), result_add_3d.shape)
+            for i in range(2):
+                for j in range(4):
+                    for k in range(4):
+                        value = i * 16 + j * 4 + k
+                        expected = value * 2.0 + value * 3.0
+                        self.assertAlmostEqual(expected,
+                                               result_add_3d[i, j, k])
+
+            result_sub_3d = array1_3d.sub_simd(array2_3d)
+            self.assertEqual(0, result_sub_3d.alignment)
+            self.assertEqual((2, 4, 4), result_sub_3d.shape)
+            for i in range(2):
+                for j in range(4):
+                    for k in range(4):
+                        value = i * 16 + j * 4 + k
+                        expected = value * 2.0 - value * 3.0
+                        self.assertAlmostEqual(expected,
+                                               result_sub_3d[i, j, k])
+
+            result_mul_3d = array1_3d.mul_simd(array2_3d)
+            self.assertEqual(0, result_mul_3d.alignment)
+            self.assertEqual((2, 4, 4), result_mul_3d.shape)
+            for i in range(2):
+                for j in range(4):
+                    for k in range(4):
+                        value = i * 16 + j * 4 + k
+                        expected = value * 2.0 * value * 3.0
+                        self.assertAlmostEqual(expected,
+                                               result_mul_3d[i, j, k])
+
+            result_div_3d = array2_3d.div_simd(array1_3d)
+            self.assertEqual(0, result_div_3d.alignment)
+            self.assertEqual((2, 4, 4), result_div_3d.shape)
+            for i in range(2):
+                for j in range(4):
+                    for k in range(4):
+                        value = i * 16 + j * 4 + k
+                        if value > 0:
+                            expected = value * 3.0 / (value * 2.0)
+                            self.assertAlmostEqual(expected,
+                                                   result_div_3d[i, j, k])
+
+    def test_alignment_size_validation_multidimensional(self):
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 16"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((1, 3), 16)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 32"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((1, 3), 32)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 64"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((3, 3), 64)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 16"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((1, 1, 1), 16)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 32"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((1, 1, 1), 32)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "ConcreteBuffer::allocate: size .* must be a multiple of alignment 64"  # noqa E501
+        ):
+            modmesh.SimpleArrayFloat64((2, 3, 5), 64)
+
+    def test_alignment_with_unaligned_rows(self):
+        # 2D arrays that row is not aligned
+        array1_2d = modmesh.SimpleArrayFloat64((2, 3), 16)
+        array2_2d = modmesh.SimpleArrayFloat64((2, 3), 16)
+
+        self.assertEqual(16, array1_2d.alignment)
+        self.assertEqual(16, array2_2d.alignment)
+        self.assertEqual((2, 3), array1_2d.shape)
+
+        for i in range(2):
+            for j in range(3):
+                array1_2d[i, j] = (i * 3 + j) * 2.0
+                array2_2d[i, j] = (i * 3 + j) * 3.0
+
+        # SIMD ops must tolerate the unaligned row stride and still yield exact math.  # noqa: E501
+        result_add = array1_2d.add_simd(array2_2d)
+        result_sub = array1_2d.sub_simd(array2_2d)
+        result_mul = array1_2d.mul_simd(array2_2d)
+
+        for i in range(2):
+            for j in range(3):
+                value = i * 3 + j
+                self.assertAlmostEqual(value * 5.0, result_add[i, j])
+                self.assertAlmostEqual(value * -1.0, result_sub[i, j])
+                self.assertAlmostEqual(value * value * 6.0, result_mul[i, j])
+
+        # Repeat with 3D data that the innermost dimension is unaligned.
+        array1_3d = modmesh.SimpleArrayFloat64((2, 2, 2), 32)
+        array2_3d = modmesh.SimpleArrayFloat64((2, 2, 2), 32)
+
+        self.assertEqual(32, array1_3d.alignment)
+        self.assertEqual(32, array2_3d.alignment)
+
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    array1_3d[i, j, k] = (i * 4 + j * 2 + k) * 2.0
+                    array2_3d[i, j, k] = (i * 4 + j * 2 + k) * 3.0
+
+        result_add_3d = array1_3d.add_simd(array2_3d)
+        result_sub_3d = array1_3d.sub_simd(array2_3d)
+        result_mul_3d = array1_3d.mul_simd(array2_3d)
+
+        for i in range(2):
+            for j in range(2):
+                for k in range(2):
+                    value = i * 4 + j * 2 + k
+                    self.assertAlmostEqual(value * 5.0,
+                                           result_add_3d[i, j, k])
+                    self.assertAlmostEqual(value * -1.0,
+                                           result_sub_3d[i, j, k])
+                    self.assertAlmostEqual(value * value * 6.0,
+                                           result_mul_3d[i, j, k])
+
+
 class SimpleArrayCalculatorsTC(unittest.TestCase):
 
     def test_minmaxsum(self):
@@ -1038,7 +1533,7 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
         self.assertEqual(npmed.imag, smed.imag)
 
         # Reference: https://github.com/numpy/numpy/issues/12943
-        nparr = np.array([1+10j, 2+1j, 3+0j, 0+3j], dtype='complex128')
+        nparr = np.array([1 + 10j, 2 + 1j, 3 + 0j, 0 + 3j], dtype='complex128')
         sarr = modmesh.SimpleArrayComplex128(array=nparr)
         npmed = np.median(nparr)
         smed = sarr.median()
@@ -1587,7 +2082,7 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
 
     def test_add(self):
         # test integer
-        def test_add_type(type):
+        def _check_add_type(type):
             arr1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             arr2 = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
             res = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
@@ -1605,16 +2100,16 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                 self.assertEqual(simdres[i], res[i])
                 self.assertEqual(sres[i], nres[i])
 
-        test_add_type('int8')
-        test_add_type('int16')
-        test_add_type('int32')
-        test_add_type('int64')
-        test_add_type('uint8')
-        test_add_type('uint16')
-        test_add_type('uint32')
-        test_add_type('uint64')
-        test_add_type('float32')
-        test_add_type('float64')
+        _check_add_type('int8')
+        _check_add_type('int16')
+        _check_add_type('int32')
+        _check_add_type('int64')
+        _check_add_type('uint8')
+        _check_add_type('uint16')
+        _check_add_type('uint32')
+        _check_add_type('uint64')
+        _check_add_type('float32')
+        _check_add_type('float64')
 
         # test boolean
         arr1 = [True, True, True, False, False, False]
@@ -1632,9 +2127,300 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
             self.assertEqual(sarr1[i], res[i])
             self.assertEqual(sres[i], nres[i])
 
+    def test_add_1d(self):
+        def _check_add_1d_type(type):
+            narr1 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=type)
+            narr2 = np.array([2, 3, 4, 5, 6, 7, 8, 9], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            sarr2 = self.type_convertor(type)(array=narr2)
+
+            nres = np.add(narr1, narr2)
+            sres = sarr1.add(sarr2)
+            for i in range(len(narr1)):
+                self.assertEqual(sres[i], nres[i])
+
+            sarr1.iadd(sarr2)
+            for i in range(len(narr1)):
+                self.assertEqual(sarr1[i], nres[i])
+
+        _check_add_1d_type('int8')
+        _check_add_1d_type('int16')
+        _check_add_1d_type('int32')
+        _check_add_1d_type('int64')
+        _check_add_1d_type('uint8')
+        _check_add_1d_type('uint16')
+        _check_add_1d_type('uint32')
+        _check_add_1d_type('uint64')
+        _check_add_1d_type('float32')
+        _check_add_1d_type('float64')
+
+        # bool
+        narr1 = np.array([True, True, False, False, True, False, True, False],
+                         dtype='bool')
+        narr2 = np.array([True, False, True, False, True, False, True, False],
+                         dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        sarr2 = modmesh.SimpleArrayBool(array=narr2)
+        nres = np.add(narr1, narr2)
+        sres = sarr1.add(sarr2)
+        for i in range(len(narr1)):
+            self.assertEqual(sres[i], nres[i])
+        sarr1.iadd(sarr2)
+        for i in range(len(narr1)):
+            self.assertEqual(sarr1[i], nres[i])
+
+    def test_add_2d(self):
+        def _check_add_2d_type(type):
+            narr1 = np.array([[1, 2, 3, 4],
+                              [5, 6, 7, 8],
+                              [9, 10, 11, 12]], dtype=type)
+            narr2 = np.array([[2, 2, 2, 2],
+                              [3, 3, 3, 3],
+                              [4, 4, 4, 4]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            sarr2 = self.type_convertor(type)(array=narr2)
+
+            nres = np.add(narr1, narr2)
+            sres = sarr1.add(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sres[i, j], nres[i, j])
+
+            sarr1.iadd(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sarr1[i, j], nres[i, j])
+
+        _check_add_2d_type('int8')
+        _check_add_2d_type('int16')
+        _check_add_2d_type('int32')
+        _check_add_2d_type('int64')
+        _check_add_2d_type('uint8')
+        _check_add_2d_type('uint16')
+        _check_add_2d_type('uint32')
+        _check_add_2d_type('uint64')
+        _check_add_2d_type('float32')
+        _check_add_2d_type('float64')
+
+        # bool
+        narr1 = np.array([[True, False, True, False],
+                          [False, True, False, True],
+                          [True, True, False, False]], dtype='bool')
+        narr2 = np.array([[True, True, False, False],
+                          [False, False, True, True],
+                          [True, False, True, False]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        sarr2 = modmesh.SimpleArrayBool(array=narr2)
+        nres = np.add(narr1, narr2)
+        sres = sarr1.add(sarr2)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                self.assertEqual(sres[i, j], nres[i, j])
+        sarr1.iadd(sarr2)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                self.assertEqual(sarr1[i, j], nres[i, j])
+
+    def test_add_3d(self):
+        def _check_add_3d_type(type):
+            narr1 = np.array([[[1, 2],
+                               [3, 4]],
+                              [[5, 6],
+                               [7, 8]]], dtype=type)
+            narr2 = np.array([[[2, 2],
+                               [2, 2]],
+                              [[3, 3],
+                               [3, 3]]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            sarr2 = self.type_convertor(type)(array=narr2)
+
+            nres = np.add(narr1, narr2)
+            sres = sarr1.add(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sres[i, j, k], nres[i, j, k])
+
+            sarr1.iadd(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sarr1[i, j, k], nres[i, j, k])
+
+        _check_add_3d_type('int8')
+        _check_add_3d_type('int16')
+        _check_add_3d_type('int32')
+        _check_add_3d_type('int64')
+        _check_add_3d_type('uint8')
+        _check_add_3d_type('uint16')
+        _check_add_3d_type('uint32')
+        _check_add_3d_type('uint64')
+        _check_add_3d_type('float32')
+        _check_add_3d_type('float64')
+
+        # bool
+        narr1 = np.array([[[True, False],
+                           [False, True]],
+                          [[True, True],
+                           [False, False]]], dtype='bool')
+        narr2 = np.array([[[False, True],
+                           [True, False]],
+                          [[True, False],
+                           [True, False]]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        sarr2 = modmesh.SimpleArrayBool(array=narr2)
+        nres = np.add(narr1, narr2)
+        sres = sarr1.add(sarr2)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                for k in range(narr1.shape[2]):
+                    self.assertEqual(sres[i, j, k], nres[i, j, k])
+        sarr1.iadd(sarr2)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                for k in range(narr1.shape[2]):
+                    self.assertEqual(sarr1[i, j, k], nres[i, j, k])
+
+    def test_add_scalar_1d(self):
+        def _check_add_scalar_1d_type(type):
+            narr1 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            scalar = 3
+
+            nres = np.add(narr1, scalar)
+            sres = sarr1.add(scalar)
+            for i in range(len(narr1)):
+                self.assertEqual(sres[i], nres[i])
+
+            sarr1.iadd(scalar)
+            for i in range(len(narr1)):
+                self.assertEqual(sarr1[i], nres[i])
+
+        _check_add_scalar_1d_type('int8')
+        _check_add_scalar_1d_type('int16')
+        _check_add_scalar_1d_type('int32')
+        _check_add_scalar_1d_type('int64')
+        _check_add_scalar_1d_type('uint8')
+        _check_add_scalar_1d_type('uint16')
+        _check_add_scalar_1d_type('uint32')
+        _check_add_scalar_1d_type('uint64')
+        _check_add_scalar_1d_type('float32')
+        _check_add_scalar_1d_type('float64')
+
+        # bool
+        narr1 = np.array([True, False, True, False, True, False, True, False],
+                         dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        scalar = True
+        nres = np.add(narr1, scalar)
+        sres = sarr1.add(scalar)
+        for i in range(len(narr1)):
+            self.assertEqual(sres[i], nres[i])
+        sarr1.iadd(scalar)
+        for i in range(len(narr1)):
+            self.assertEqual(sarr1[i], nres[i])
+
+    def test_add_scalar_2d(self):
+        def _check_add_scalar_2d_type(type):
+            narr1 = np.array([[1, 2, 3, 4],
+                              [5, 6, 7, 8],
+                              [9, 10, 11, 12]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            scalar = 3
+
+            nres = np.add(narr1, scalar)
+            sres = sarr1.add(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sres[i, j], nres[i, j])
+
+            sarr1.iadd(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sarr1[i, j], nres[i, j])
+
+        _check_add_scalar_2d_type('int8')
+        _check_add_scalar_2d_type('int16')
+        _check_add_scalar_2d_type('int32')
+        _check_add_scalar_2d_type('int64')
+        _check_add_scalar_2d_type('uint8')
+        _check_add_scalar_2d_type('uint16')
+        _check_add_scalar_2d_type('uint32')
+        _check_add_scalar_2d_type('uint64')
+        _check_add_scalar_2d_type('float32')
+        _check_add_scalar_2d_type('float64')
+
+        # bool
+        narr1 = np.array([[True, False, True, False],
+                          [False, True, False, True],
+                          [True, True, False, False]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        scalar = True
+        nres = np.add(narr1, scalar)
+        sres = sarr1.add(scalar)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                self.assertEqual(sres[i, j], nres[i, j])
+        sarr1.iadd(scalar)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                self.assertEqual(sarr1[i, j], nres[i, j])
+
+    def test_add_scalar_3d(self):
+        def _check_add_scalar_3d_type(type):
+            narr1 = np.array([[[1, 2],
+                               [3, 4]],
+                              [[5, 6],
+                               [7, 8]]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            scalar = 3
+
+            nres = np.add(narr1, scalar)
+            sres = sarr1.add(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sres[i, j, k], nres[i, j, k])
+
+            sarr1.iadd(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sarr1[i, j, k], nres[i, j, k])
+
+        _check_add_scalar_3d_type('int8')
+        _check_add_scalar_3d_type('int16')
+        _check_add_scalar_3d_type('int32')
+        _check_add_scalar_3d_type('int64')
+        _check_add_scalar_3d_type('uint8')
+        _check_add_scalar_3d_type('uint16')
+        _check_add_scalar_3d_type('uint32')
+        _check_add_scalar_3d_type('uint64')
+        _check_add_scalar_3d_type('float32')
+        _check_add_scalar_3d_type('float64')
+
+        # bool
+        narr1 = np.array([[[True, False],
+                           [False, True]],
+                          [[True, True],
+                           [False, False]]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        scalar = True
+        nres = np.add(narr1, scalar)
+        sres = sarr1.add(scalar)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                for k in range(narr1.shape[2]):
+                    self.assertEqual(sres[i, j, k], nres[i, j, k])
+        sarr1.iadd(scalar)
+        for i in range(narr1.shape[0]):
+            for j in range(narr1.shape[1]):
+                for k in range(narr1.shape[2]):
+                    self.assertEqual(sarr1[i, j, k], nres[i, j, k])
+
     def test_sub(self):
         # test integer
-        def test_sub_type(type):
+        def _check_sub_type(type):
             arr1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             arr2 = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
             narr1 = np.array(arr1, dtype=type)
@@ -1651,16 +2437,16 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                 self.assertEqual(simdres[i], arr1[i])
                 self.assertEqual(sres[i], nres[i])
 
-        test_sub_type('int8')
-        test_sub_type('int16')
-        test_sub_type('int32')
-        test_sub_type('int64')
-        test_sub_type('uint8')
-        test_sub_type('uint16')
-        test_sub_type('uint32')
-        test_sub_type('uint64')
-        test_sub_type('float32')
-        test_sub_type('float64')
+        _check_sub_type('int8')
+        _check_sub_type('int16')
+        _check_sub_type('int32')
+        _check_sub_type('int64')
+        _check_sub_type('uint8')
+        _check_sub_type('uint16')
+        _check_sub_type('uint32')
+        _check_sub_type('uint64')
+        _check_sub_type('float32')
+        _check_sub_type('float64')
 
         # test boolean
         arr1 = [True, True, True, False, False, False]
@@ -1683,8 +2469,317 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
         ):
             sarr2.isub(sarr1)
 
+    def test_sub_1d(self):
+        def _check_sub_1d_type(type):
+            narr1 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=type)
+            narr2 = np.array([2, 3, 4, 5, 6, 7, 8, 9], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            sarr2 = self.type_convertor(type)(array=narr2)
+
+            nres = np.subtract(narr1, narr2)
+            sres = sarr1.sub(sarr2)
+            for i in range(len(narr1)):
+                self.assertEqual(sres[i], nres[i])
+
+            sarr1.isub(sarr2)
+            for i in range(len(narr1)):
+                self.assertEqual(sarr1[i], nres[i])
+
+        _check_sub_1d_type('int8')
+        _check_sub_1d_type('int16')
+        _check_sub_1d_type('int32')
+        _check_sub_1d_type('int64')
+        _check_sub_1d_type('uint8')
+        _check_sub_1d_type('uint16')
+        _check_sub_1d_type('uint32')
+        _check_sub_1d_type('uint64')
+        _check_sub_1d_type('float32')
+        _check_sub_1d_type('float64')
+
+        # bool
+        narr1 = np.array([True, True, False, False, True, False, True, False],
+                         dtype='bool')
+        narr2 = np.array([True, False, True, False, True, False, True, False],
+                         dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        sarr2 = modmesh.SimpleArrayBool(array=narr2)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.sub(sarr2)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.isub(sarr2)
+
+    def test_sub_2d(self):
+        def _check_sub_2d_type(type):
+            narr1 = np.array([[1, 2, 3, 4],
+                              [5, 6, 7, 8],
+                              [9, 10, 11, 12]], dtype=type)
+            narr2 = np.array([[2, 2, 2, 2],
+                              [3, 3, 3, 3],
+                              [4, 4, 4, 4]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            sarr2 = self.type_convertor(type)(array=narr2)
+
+            nres = np.subtract(narr1, narr2)
+            sres = sarr1.sub(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sres[i, j], nres[i, j])
+
+            sarr1.isub(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sarr1[i, j], nres[i, j])
+
+        _check_sub_2d_type('int8')
+        _check_sub_2d_type('int16')
+        _check_sub_2d_type('int32')
+        _check_sub_2d_type('int64')
+        _check_sub_2d_type('uint8')
+        _check_sub_2d_type('uint16')
+        _check_sub_2d_type('uint32')
+        _check_sub_2d_type('uint64')
+        _check_sub_2d_type('float32')
+        _check_sub_2d_type('float64')
+
+        # bool
+        narr1 = np.array([[True, False, True, False],
+                          [False, True, False, True],
+                          [True, True, False, False]], dtype='bool')
+        narr2 = np.array([[True, True, False, False],
+                          [False, False, True, True],
+                          [True, False, True, False]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        sarr2 = modmesh.SimpleArrayBool(array=narr2)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.sub(sarr2)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.isub(sarr2)
+
+    def test_sub_3d(self):
+        def _check_sub_3d_type(type):
+            narr1 = np.array([[[1, 2],
+                               [3, 4]],
+                              [[5, 6],
+                               [7, 8]]], dtype=type)
+            narr2 = np.array([[[2, 2],
+                               [2, 2]],
+                              [[3, 3],
+                               [3, 3]]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            sarr2 = self.type_convertor(type)(array=narr2)
+
+            nres = np.subtract(narr1, narr2)
+            sres = sarr1.sub(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sres[i, j, k], nres[i, j, k])
+
+            sarr1.isub(sarr2)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sarr1[i, j, k], nres[i, j, k])
+
+        _check_sub_3d_type('int8')
+        _check_sub_3d_type('int16')
+        _check_sub_3d_type('int32')
+        _check_sub_3d_type('int64')
+        _check_sub_3d_type('uint8')
+        _check_sub_3d_type('uint16')
+        _check_sub_3d_type('uint32')
+        _check_sub_3d_type('uint64')
+        _check_sub_3d_type('float32')
+        _check_sub_3d_type('float64')
+
+        # bool
+        narr1 = np.array([[[True, False],
+                           [False, True]],
+                          [[True, True],
+                           [False, False]]], dtype='bool')
+        narr2 = np.array([[[False, True],
+                           [True, False]],
+                          [[True, False],
+                           [True, False]]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        sarr2 = modmesh.SimpleArrayBool(array=narr2)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.sub(sarr2)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.isub(sarr2)
+
+    def test_sub_scalar_1d(self):
+        def _check_sub_scalar_1d_type(type):
+            narr1 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            scalar = 3
+
+            nres = np.subtract(narr1, scalar)
+            sres = sarr1.sub(scalar)
+            for i in range(len(narr1)):
+                self.assertEqual(sres[i], nres[i])
+
+            sarr1.isub(scalar)
+            for i in range(len(narr1)):
+                self.assertEqual(sarr1[i], nres[i])
+
+        _check_sub_scalar_1d_type('int8')
+        _check_sub_scalar_1d_type('int16')
+        _check_sub_scalar_1d_type('int32')
+        _check_sub_scalar_1d_type('int64')
+        _check_sub_scalar_1d_type('uint8')
+        _check_sub_scalar_1d_type('uint16')
+        _check_sub_scalar_1d_type('uint32')
+        _check_sub_scalar_1d_type('uint64')
+        _check_sub_scalar_1d_type('float32')
+        _check_sub_scalar_1d_type('float64')
+
+        # bool
+        narr1 = np.array([True, False, True, False, True, False, True, False],
+                         dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        scalar = True
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.sub(scalar)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.isub(scalar)
+
+    def test_sub_scalar_2d(self):
+        def _check_sub_scalar_2d_type(type):
+            narr1 = np.array([[1, 2, 3, 4],
+                              [5, 6, 7, 8],
+                              [9, 10, 11, 12]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            scalar = 3
+
+            nres = np.subtract(narr1, scalar)
+            sres = sarr1.sub(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sres[i, j], nres[i, j])
+
+            sarr1.isub(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    self.assertEqual(sarr1[i, j], nres[i, j])
+
+        _check_sub_scalar_2d_type('int8')
+        _check_sub_scalar_2d_type('int16')
+        _check_sub_scalar_2d_type('int32')
+        _check_sub_scalar_2d_type('int64')
+        _check_sub_scalar_2d_type('uint8')
+        _check_sub_scalar_2d_type('uint16')
+        _check_sub_scalar_2d_type('uint32')
+        _check_sub_scalar_2d_type('uint64')
+        _check_sub_scalar_2d_type('float32')
+        _check_sub_scalar_2d_type('float64')
+
+        # bool
+        narr1 = np.array([[True, False, True, False],
+                          [False, True, False, True],
+                          [True, True, False, False]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        scalar = True
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.sub(scalar)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.isub(scalar)
+
+    def test_sub_scalar_3d(self):
+        def _check_sub_scalar_3d_type(type):
+            narr1 = np.array([[[1, 2],
+                               [3, 4]],
+                              [[5, 6],
+                               [7, 8]]], dtype=type)
+            sarr1 = self.type_convertor(type)(array=narr1)
+            scalar = 3
+
+            nres = np.subtract(narr1, scalar)
+            sres = sarr1.sub(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sres[i, j, k], nres[i, j, k])
+
+            sarr1.isub(scalar)
+            for i in range(narr1.shape[0]):
+                for j in range(narr1.shape[1]):
+                    for k in range(narr1.shape[2]):
+                        self.assertEqual(sarr1[i, j, k], nres[i, j, k])
+
+        _check_sub_scalar_3d_type('int8')
+        _check_sub_scalar_3d_type('int16')
+        _check_sub_scalar_3d_type('int32')
+        _check_sub_scalar_3d_type('int64')
+        _check_sub_scalar_3d_type('uint8')
+        _check_sub_scalar_3d_type('uint16')
+        _check_sub_scalar_3d_type('uint32')
+        _check_sub_scalar_3d_type('uint64')
+        _check_sub_scalar_3d_type('float32')
+        _check_sub_scalar_3d_type('float64')
+
+        # bool
+        narr1 = np.array([[[True, False],
+                           [False, True]],
+                          [[True, True],
+                           [False, False]]], dtype='bool')
+        sarr1 = modmesh.SimpleArrayBool(array=narr1)
+        scalar = True
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.sub(scalar)
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"SimpleArray<bool>::isub\(\): "
+            r"boolean value doesn't support this operation"
+        ):
+            sarr1.isub(scalar)
+
     def test_mul(self):
-        def test_mul_type(type):
+        def _check_mul_type(type):
             arr1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
             arr2 = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
             res = [2, 8, 18, 32, 50, 72, 98, 128, 162, 200]
@@ -1702,15 +2797,15 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                 self.assertEqual(simdres[i], res[i])
                 self.assertEqual(sres[i], nres[i])
 
-        test_mul_type('int16')
-        test_mul_type('int32')
-        test_mul_type('int64')
-        test_mul_type('uint8')
-        test_mul_type('uint16')
-        test_mul_type('uint32')
-        test_mul_type('uint64')
-        test_mul_type('float32')
-        test_mul_type('float64')
+        _check_mul_type('int16')
+        _check_mul_type('int32')
+        _check_mul_type('int64')
+        _check_mul_type('uint8')
+        _check_mul_type('uint16')
+        _check_mul_type('uint32')
+        _check_mul_type('uint64')
+        _check_mul_type('float32')
+        _check_mul_type('float64')
 
         # test boolean
         arr1 = [True, True, True, False, False, False]
@@ -1729,7 +2824,7 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
             self.assertEqual(sres[i], nres[i])
 
     def test_mul_1d(self):
-        def test_mul_1d_type(type):
+        def _check_mul_1d_type(type):
             narr1 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=type)
             narr2 = np.array([2, 3, 4, 5, 6, 7, 8, 9], dtype=type)
             sarr1 = self.type_convertor(type)(array=narr1)
@@ -1744,13 +2839,13 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
             for i in range(len(narr1)):
                 self.assertEqual(sarr1[i], nres[i])
 
-        test_mul_1d_type('int32')
-        test_mul_1d_type('int64')
-        test_mul_1d_type('float32')
-        test_mul_1d_type('float64')
+        _check_mul_1d_type('int32')
+        _check_mul_1d_type('int64')
+        _check_mul_1d_type('float32')
+        _check_mul_1d_type('float64')
 
     def test_mul_2d(self):
-        def test_mul_2d_type(type):
+        def _check_mul_2d_type(type):
             narr1 = np.array([[1, 2, 3, 4],
                               [5, 6, 7, 8],
                               [9, 10, 11, 12]], dtype=type)
@@ -1771,13 +2866,13 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                 for j in range(narr1.shape[1]):
                     self.assertEqual(sarr1[i, j], nres[i, j])
 
-        test_mul_2d_type('int32')
-        test_mul_2d_type('int64')
-        test_mul_2d_type('float32')
-        test_mul_2d_type('float64')
+        _check_mul_2d_type('int32')
+        _check_mul_2d_type('int64')
+        _check_mul_2d_type('float32')
+        _check_mul_2d_type('float64')
 
     def test_mul_3d(self):
-        def test_mul_3d_type(type):
+        def _check_mul_3d_type(type):
             narr1 = np.arange(24, dtype=type).reshape((2, 3, 4))
             narr2 = np.arange(1, 25, dtype=type).reshape((2, 3, 4))
             sarr1 = self.type_convertor(type)(array=narr1)
@@ -1796,14 +2891,14 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                     for k in range(narr1.shape[2]):
                         self.assertEqual(sarr1[i, j, k], nres[i, j, k])
 
-        test_mul_3d_type('int32')
-        test_mul_3d_type('int64')
-        test_mul_3d_type('float32')
-        test_mul_3d_type('float64')
+        _check_mul_3d_type('int32')
+        _check_mul_3d_type('int64')
+        _check_mul_3d_type('float32')
+        _check_mul_3d_type('float64')
 
     def test_mul_scalar_1d(self):
         """Test 1D array scalar multiplication"""
-        def test_mul_scalar_1d_type(type):
+        def _check_mul_scalar_1d_type(type):
             narr1 = np.array([1, 2, 3, 4, 5, 6, 7, 8], dtype=type)
             sarr1 = self.type_convertor(type)(array=narr1)
             scalar = 3
@@ -1818,14 +2913,14 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
             for i in range(len(narr1)):
                 self.assertEqual(sarr1[i], nres[i])
 
-        test_mul_scalar_1d_type('int32')
-        test_mul_scalar_1d_type('int64')
-        test_mul_scalar_1d_type('float32')
-        test_mul_scalar_1d_type('float64')
+        _check_mul_scalar_1d_type('int32')
+        _check_mul_scalar_1d_type('int64')
+        _check_mul_scalar_1d_type('float32')
+        _check_mul_scalar_1d_type('float64')
 
     def test_mul_scalar_2d(self):
         """Test 2D array (matrix) scalar multiplication"""
-        def test_mul_scalar_2d_type(type):
+        def _check_mul_scalar_2d_type(type):
             narr1 = np.array([[1, 2, 3, 4],
                               [5, 6, 7, 8],
                               [9, 10, 11, 12]], dtype=type)
@@ -1843,14 +2938,14 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                 for j in range(narr1.shape[1]):
                     self.assertEqual(sarr1[i, j], nres[i, j])
 
-        test_mul_scalar_2d_type('int32')
-        test_mul_scalar_2d_type('int64')
-        test_mul_scalar_2d_type('float32')
-        test_mul_scalar_2d_type('float64')
+        _check_mul_scalar_2d_type('int32')
+        _check_mul_scalar_2d_type('int64')
+        _check_mul_scalar_2d_type('float32')
+        _check_mul_scalar_2d_type('float64')
 
     def test_mul_scalar_3d(self):
         """Test 3D array scalar multiplication"""
-        def test_mul_scalar_3d_type(type):
+        def _check_mul_scalar_3d_type(type):
             narr1 = np.arange(24, dtype=type).reshape((2, 3, 4))
             sarr1 = self.type_convertor(type)(array=narr1)
             scalar = 5
@@ -1868,16 +2963,16 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                     for k in range(narr1.shape[2]):
                         self.assertEqual(sarr1[i, j, k], nres[i, j, k])
 
-        test_mul_scalar_3d_type('int32')
-        test_mul_scalar_3d_type('int64')
-        test_mul_scalar_3d_type('float32')
-        test_mul_scalar_3d_type('float64')
+        _check_mul_scalar_3d_type('int32')
+        _check_mul_scalar_3d_type('int64')
+        _check_mul_scalar_3d_type('float32')
+        _check_mul_scalar_3d_type('float64')
 
     def test_div(self):
         arr1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
         arr2 = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20]
 
-        def test_div_type(type):
+        def _check_div_type(type):
             res = [2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
             narr1 = np.array(arr1, dtype=type)
             narr2 = np.array(arr2, dtype=type)
@@ -1893,14 +2988,14 @@ class SimpleArrayCalculatorsTC(unittest.TestCase):
                 self.assertEqual(simdres[i], res[i])
                 self.assertEqual(sres[i], nres[i])
 
-        test_div_type('int8')
-        test_div_type('int16')
-        test_div_type('int32')
-        test_div_type('int64')
-        test_div_type('uint8')
-        test_div_type('uint16')
-        test_div_type('uint32')
-        test_div_type('uint64')
+        _check_div_type('int8')
+        _check_div_type('int16')
+        _check_div_type('int32')
+        _check_div_type('int64')
+        _check_div_type('uint8')
+        _check_div_type('uint16')
+        _check_div_type('uint32')
+        _check_div_type('uint64')
 
         # test float
         res = [5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0, 5.0]
@@ -2207,5 +3302,154 @@ class SimpleCollectorTC(unittest.TestCase):
         self.assertEqual(20, ct.capacity)  # double capacity but not power of 2
         self.assertEqual(11, len(ct))
         self.assertEqual(ct[10], 3.14159 * 4)
+
+    def test_alignment_validation(self):
+        # Valid alignments: 0, 16, 32, 64
+        ct = modmesh.SimpleCollectorFloat64(16, 16)
+        self.assertEqual(16, ct.alignment)
+
+        ct = modmesh.SimpleCollectorFloat64(32, 32)
+        self.assertEqual(32, ct.alignment)
+
+        ct = modmesh.SimpleCollectorFloat64(64, 64)
+        self.assertEqual(64, ct.alignment)
+
+        ct = modmesh.SimpleCollectorFloat64(16, 0)
+        self.assertEqual(0, ct.alignment)
+
+        # Invalid alignments
+        with self.assertRaisesRegex(
+                ValueError,
+                "BufferExpander::BufferExpander: alignment must be 0, 16, 32, or 64, but got 8"  # noqa E501
+        ):
+            modmesh.SimpleCollectorFloat64(16, 8)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "BufferExpander::BufferExpander: alignment must be 0, 16, 32, or 64, but got 128"  # noqa E501
+        ):
+            modmesh.SimpleCollectorFloat64(128, 128)
+
+    def test_alignment_size_validation(self):
+        # Size must be a multiple of alignment
+        ct = modmesh.SimpleCollectorFloat64(0, 16)
+        self.assertEqual(16, ct.alignment)
+
+        ct = modmesh.SimpleCollectorFloat64(16, 16)
+        self.assertEqual(16, len(ct))
+
+        ct = modmesh.SimpleCollectorFloat64(32, 16)
+        self.assertEqual(32, len(ct))
+
+        ct = modmesh.SimpleCollectorFloat64(64, 32)
+        self.assertEqual(64, len(ct))
+
+        # Invalid sizes (not multiple of alignment)
+        with self.assertRaisesRegex(
+                ValueError,
+                "BufferExpander::allocate: size .* must be a multiple of alignment 16"  # noqa E501
+        ):
+            modmesh.SimpleCollectorFloat64(17, 16)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "BufferExpander::allocate: size .* must be a multiple of alignment 32"  # noqa E501
+        ):
+            modmesh.SimpleCollectorFloat64(31, 32)
+
+    def test_alignment_with_reserve(self):
+        # Test that reserve maintains alignment
+        ct = modmesh.SimpleCollectorFloat64(16, 16)
+        self.assertEqual(16, ct.capacity)
+
+        # Reserve with aligned size
+        ct.reserve(32)
+        self.assertEqual(32, ct.capacity)
+
+        # Verify alignment is maintained
+        self.assertEqual(16, ct.alignment)
+
+        # Reserve with non-aligned size should fail
+        with self.assertRaisesRegex(
+                ValueError,
+                "BufferExpander::allocate: size .* must be a multiple of alignment 16"  # noqa E501
+        ):
+            ct.reserve(33)
+
+        ct = modmesh.SimpleCollectorFloat64(0, 32)  # start from 0 capacity
+        self.assertEqual(0, ct.capacity)
+        self.assertEqual(32, ct.alignment)
+        ct.reserve(64)
+        self.assertEqual(64, ct.capacity)
+
+    def test_alignment_with_push_back(self):
+        # Test that push_back works with alignment
+        ct = modmesh.SimpleCollectorFloat64(16, 16)
+        self.assertEqual(16, len(ct))
+        self.assertEqual(16, ct.capacity)
+
+        # Push back should expand with aligned size
+        ct.push_back(3.14159)
+        self.assertEqual(17, len(ct))
+        # Capacity should be doubled and remain aligned (32 elements = 256 bytes aligned to 16)  # noqa E501
+        self.assertEqual(32, ct.capacity)
+
+        # Verify alignment is maintained
+        self.assertEqual(16, ct.alignment)
+
+    def test_alignment_preserved_in_as_array(self):
+        ct = modmesh.SimpleCollectorFloat64(16, 32)
+        self.assertEqual(32, ct.alignment)
+        self.assertEqual(16, len(ct))
+
+        for it in range(16):
+            ct[it] = it * 3.14
+
+        arr = ct.as_array()
+        self.assertEqual(16, len(arr))
+        self.assertEqual(32, arr.alignment)
+
+        for it in range(16):
+            self.assertEqual(it * 3.14, arr[it])
+
+    def test_alignment_preserved_in_as_concrete(self):
+        ep = modmesh.BufferExpander(128, 16)
+        self.assertEqual(16, ep.alignment)
+        self.assertEqual(128, len(ep))
+
+        for it in range(128):
+            ep[it] = it
+
+        cbuf = ep.as_concrete()
+        self.assertEqual(128, len(cbuf))
+        self.assertEqual(16, cbuf.alignment)
+
+        for it in range(128):
+            self.assertEqual(it, cbuf[it])
+
+    def test_alignment_preserved_in_as_concrete_with_capacity(self):
+        ep = modmesh.BufferExpander(64, 32)
+        self.assertEqual(32, ep.alignment)
+        self.assertEqual(64, len(ep))
+
+        for it in range(64):
+            ep[it] = it
+
+        cbuf = ep.as_concrete(128)
+        self.assertEqual(128, len(cbuf))
+        self.assertEqual(32, cbuf.alignment)
+
+        for it in range(64):
+            self.assertEqual(it, cbuf[it])
+
+    def test_alignment_validation_in_as_concrete(self):
+        ep = modmesh.BufferExpander(64, 32)
+        self.assertEqual(32, ep.alignment)
+
+        with self.assertRaisesRegex(
+                ValueError,
+                "BufferExpander::as_concrete: size .* must be a multiple of alignment 32"  # noqa E501
+        ):
+            ep.as_concrete(100)
 
 # vim: set ff=unix fenc=utf8 et sw=4 ts=4 sts=4:

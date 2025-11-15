@@ -37,11 +37,11 @@
 // I use <modmesh/toggle/RadixTree.hpp> instead.
 #include <modmesh/toggle/RadixTree.hpp>
 
-#include <limits>
-#include <stdexcept>
-#include <functional>
-#include <numeric>
 #include <algorithm>
+#include <functional>
+#include <limits>
+#include <numeric>
+#include <stdexcept>
 
 #if defined(_MSC_VER)
 #include <BaseTsd.h>
@@ -405,7 +405,8 @@ public:
         }
         else
         {
-            do {
+            do
+            {
                 acc += athis->at(sidx) * athis->at(sidx);
             } while (athis->next_sidx(sidx));
         }
@@ -513,9 +514,19 @@ public:
         return A(*static_cast<A const *>(this)).iadd(other);
     }
 
+    A add(value_type scalar) const
+    {
+        return A(*static_cast<A const *>(this)).iadd(scalar);
+    }
+
     A sub(A const & other) const
     {
         return A(*static_cast<A const *>(this)).isub(other);
+    }
+
+    A sub(value_type scalar) const
+    {
+        return A(*static_cast<A const *>(this)).isub(scalar);
     }
 
     A mul(A const & other) const
@@ -561,6 +572,30 @@ public:
         return *athis;
     }
 
+    A & iadd(value_type scalar)
+    {
+        auto athis = static_cast<A *>(this);
+        if constexpr (!std::is_same_v<bool, std::remove_const_t<value_type>>)
+        {
+            const value_type * const end = athis->end();
+            value_type * ptr = athis->begin();
+
+            while (ptr < end)
+            {
+                *ptr += scalar;
+                ++ptr;
+            }
+        }
+        else
+        {
+            if (scalar)
+            {
+                std::fill(athis->begin(), athis->end(), true);
+            }
+        }
+        return *athis;
+    }
+
     A & isub(A const & other)
     {
         auto athis = static_cast<A *>(this);
@@ -575,6 +610,27 @@ public:
                 *ptr -= *other_ptr;
                 ++ptr;
                 ++other_ptr;
+            }
+        }
+        else
+        {
+            throw std::runtime_error(Formatter() << "SimpleArray<bool>::isub(): boolean value doesn't support this operation");
+        }
+        return *athis;
+    }
+
+    A & isub(value_type scalar)
+    {
+        auto athis = static_cast<A *>(this);
+        if constexpr (!std::is_same_v<bool, std::remove_const_t<value_type>>)
+        {
+            const value_type * const end = athis->end();
+            value_type * ptr = athis->begin();
+
+            while (ptr < end)
+            {
+                *ptr -= scalar;
+                ++ptr;
             }
         }
         else
@@ -795,7 +851,7 @@ detail::SimpleArrayMixinCalculators<A, T>::median_op(small_vector<value_type> & 
 /**
  * Calculate median using frequency counting for small data types.
  * This algorithm is optimized for uint8_t, int8_t, and bool types where
- * the range of possible values is small (≤256). Instead of sorting,
+ * the range of possible values is small (<=256). Instead of sorting,
  * it counts the frequency of each value and finds the median position.
  *
  * Algorithm:
@@ -856,7 +912,7 @@ detail::SimpleArrayMixinCalculators<A, T>::median_freq(small_vector<value_type> 
 
 /**
  * Perform matrix multiplication for 2D arrays.
- * This implementation supports only 2D × 2D matrix multiplication.
+ * This implementation supports only 2D x 2D matrix multiplication.
  */
 template <typename A, typename T>
 A SimpleArrayMixinCalculators<A, T>::matmul(A const & other) const
@@ -923,7 +979,7 @@ A SimpleArrayMixinCalculators<A, T>::matmul(A const & other) const
 
 /**
  * Perform in-place matrix multiplication for 2D arrays.
- * This implementation supports only 2D × 2D matrix multiplication.
+ * This implementation supports only 2D x 2D matrix multiplication.
  * The result replaces the content of the current array.
  */
 template <typename A, typename T>
@@ -1056,6 +1112,11 @@ public:
 
 } /* end namespace detail */
 
+// Tag type for explicit alignment constructor
+struct with_alignment_t
+{
+};
+
 /**
  * Simple array type for contiguous memory storage. Size does not change. The
  * copy semantics performs data copy. The move semantics invalidates the
@@ -1085,8 +1146,11 @@ public:
 
     static constexpr size_t itemsize() { return ITEMSIZE; }
 
-    explicit SimpleArray(size_t length)
-        : m_buffer(buffer_type::construct(length * ITEMSIZE))
+    /// Constructor with length and optional alignment
+    /// @param length the length of the array in items
+    /// @param alignment the memory alignment in bytes (default: 0, no special alignment, and valid values are 16, 32, and 64)
+    explicit SimpleArray(size_t length, size_t alignment = 0)
+        : m_buffer(buffer_type::construct(length * ITEMSIZE, alignment))
         , m_shape{length}
         , m_stride{1}
         , m_body(m_buffer->template data<T>())
@@ -1094,8 +1158,8 @@ public:
     }
 
     template <class InputIt>
-    SimpleArray(InputIt first, InputIt last)
-        : SimpleArray(last - first)
+    SimpleArray(InputIt first, InputIt last, size_t alignment = 0)
+        : SimpleArray(last - first, alignment)
     {
         std::copy(first, last, data());
     }
@@ -1107,13 +1171,30 @@ public:
     {
         if (!m_shape.empty())
         {
-            m_buffer = buffer_type::construct(m_shape[0] * m_stride[0] * ITEMSIZE);
+            m_buffer = buffer_type::construct(m_shape[0] * m_stride[0] * ITEMSIZE, 0);
             m_body = m_buffer->template data<T>();
         }
     }
 
     // NOLINTNEXTLINE(modernize-pass-by-value)
-    explicit SimpleArray(small_vector<size_t> const & shape, value_type const & value)
+    SimpleArray(small_vector<size_t> const & shape, size_t alignment, with_alignment_t const & /* unnamed argument for tagging */)
+        : m_shape(shape)
+        , m_stride(calc_stride(m_shape))
+    {
+        if (!m_shape.empty())
+        {
+            m_buffer = buffer_type::construct(m_shape[0] * m_stride[0] * ITEMSIZE, alignment);
+            m_body = m_buffer->template data<T>();
+        }
+    }
+
+    SimpleArray(small_vector<size_t> const & shape, value_type const & value, size_t alignment)
+        : SimpleArray(shape, alignment, with_alignment_t{})
+    {
+        std::fill(begin(), end(), value);
+    }
+
+    SimpleArray(small_vector<size_t> const & shape, value_type const & value)
         : SimpleArray(shape)
     {
         std::fill(begin(), end(), value);
@@ -1125,12 +1206,29 @@ public:
     {
         if (!m_shape.empty())
         {
-            m_buffer = buffer_type::construct(m_shape[0] * m_stride[0] * ITEMSIZE);
+            m_buffer = buffer_type::construct(m_shape[0] * m_stride[0] * ITEMSIZE, 0);
             m_body = m_buffer->template data<T>();
         }
     }
 
-    explicit SimpleArray(std::vector<size_t> const & shape, value_type const & value)
+    SimpleArray(std::vector<size_t> const & shape, size_t alignment, with_alignment_t)
+        : m_shape(shape)
+        , m_stride(calc_stride(m_shape))
+    {
+        if (!m_shape.empty())
+        {
+            m_buffer = buffer_type::construct(m_shape[0] * m_stride[0] * ITEMSIZE, alignment);
+            m_body = m_buffer->template data<T>();
+        }
+    }
+
+    SimpleArray(std::vector<size_t> const & shape, value_type const & value, size_t alignment)
+        : SimpleArray(shape, alignment, with_alignment_t{})
+    {
+        std::fill(begin(), end(), value);
+    }
+
+    SimpleArray(std::vector<size_t> const & shape, value_type const & value)
         : SimpleArray(shape)
     {
         std::fill(begin(), end(), value);
@@ -1336,6 +1434,9 @@ public:
         }
         return size;
     }
+
+    /// Return the underlying buffer alignment in bytes. If no buffer or no alignment, return 0.
+    size_t alignment() const noexcept { return m_buffer ? m_buffer->alignment() : 0; }
 
     using iterator = T *;
     using const_iterator = T const *;

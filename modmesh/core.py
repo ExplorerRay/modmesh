@@ -131,6 +131,10 @@ list_of_transform = [
 list_of_linalg = [
     'llt_factorization',
     'llt_solve',
+    'KalmanFilterFp32',
+    'KalmanFilterFp64',
+    'KalmanFilterComplex64',
+    'KalmanFilterComplex128',
 ]
 
 # universe directory symbols
@@ -141,12 +145,16 @@ list_of_universe = [
     'Point3dFp64',
     'Segment3dFp32',
     'Segment3dFp64',
+    'Triangle3dFp32',
+    'Triangle3dFp64',
     'Bezier3dFp32',
     'Bezier3dFp64',
     'PointPadFp32',
     'PointPadFp64',
     'SegmentPadFp32',
     'SegmentPadFp64',
+    'TrianglePadFp32',
+    'TrianglePadFp64',
     'CurvePadFp32',
     'CurvePadFp64',
     'WorldFp32',
