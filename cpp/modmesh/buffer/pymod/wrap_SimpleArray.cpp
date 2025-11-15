@@ -62,10 +62,23 @@ class MODMESH_PYTHON_WRAPPER_VISIBILITY WrapSimpleArray
                 py::arg("shape"))
             .def_timed(
                 py::init(
+                    [](py::object const & shape, size_t alignment)
+                    { return wrapped_type(make_shape(shape), alignment, with_alignment_t{}); }),
+                py::arg("shape"),
+                py::arg("alignment"))
+            .def_timed(
+                py::init(
                     [](py::object const & shape, value_type const & value)
                     { return wrapped_type(make_shape(shape), value); }),
                 py::arg("shape"),
                 py::arg("value"))
+            .def_timed(
+                py::init(
+                    [](py::object const & shape, value_type const & value, size_t alignment)
+                    { return wrapped_type(make_shape(shape), value, alignment); }),
+                py::arg("shape"),
+                py::arg("value"),
+                py::arg("alignment"))
             .def(
                 py::init(
                     [](py::array & arr_in)
@@ -151,6 +164,7 @@ class MODMESH_PYTHON_WRAPPER_VISIBILITY WrapSimpleArray
             .def_property_readonly("nbytes", &wrapped_type::nbytes)
             .def_property_readonly("size", &wrapped_type::size)
             .def_property_readonly("itemsize", &wrapped_type::itemsize)
+            .def_property_readonly("alignment", &wrapped_type::alignment)
             .def_property_readonly(
                 "shape",
                 [](wrapped_type const & self)
@@ -310,8 +324,22 @@ class MODMESH_PYTHON_WRAPPER_VISIBILITY WrapSimpleArray
             .def("max", &wrapped_type::max)
             .def("sum", &wrapped_type::sum)
             .def("abs", &wrapped_type::abs)
-            .def("add", &wrapped_type::add)
-            .def("sub", &wrapped_type::sub)
+            .def(
+                "add",
+                [](wrapped_type const & self, wrapped_type const & other)
+                { return self.add(other); })
+            .def(
+                "add",
+                [](wrapped_type const & self, value_type scalar)
+                { return self.add(scalar); })
+            .def(
+                "sub",
+                [](wrapped_type const & self, wrapped_type const & other)
+                { return self.sub(other); })
+            .def(
+                "sub",
+                [](wrapped_type const & self, value_type scalar)
+                { return self.sub(scalar); })
             .def(
                 "mul",
                 [](wrapped_type const & self, wrapped_type const & other)
@@ -333,10 +361,22 @@ class MODMESH_PYTHON_WRAPPER_VISIBILITY WrapSimpleArray
              * (e.g., a = a.__iadd__(b)).
              * See: https://docs.python.org/3/reference/datamodel.html#emulating-numeric-types
              */
-            .def("iadd", [](wrapped_type & self, wrapped_type const & other)
-                 { self.iadd(other); })
-            .def("isub", [](wrapped_type & self, wrapped_type const & other)
-                 { self.isub(other); })
+            .def(
+                "iadd",
+                [](wrapped_type & self, wrapped_type const & other)
+                { self.iadd(other); })
+            .def(
+                "iadd",
+                [](wrapped_type & self, value_type scalar)
+                { self.iadd(scalar); })
+            .def(
+                "isub",
+                [](wrapped_type & self, wrapped_type const & other)
+                { self.isub(other); })
+            .def(
+                "isub",
+                [](wrapped_type & self, value_type scalar)
+                { self.isub(scalar); })
             .def(
                 "imul",
                 [](wrapped_type & self, wrapped_type const & other)
@@ -513,13 +553,15 @@ WrapSimpleCollector<T>::WrapSimpleCollector(pybind11::module & mod, char const *
     (*this)
         .def_timed(
             py::init(
-                [](size_t length)
-                { return wrapped_type(length); }),
-            py::arg("length"))
+                [](size_t length, size_t alignment)
+                { return wrapped_type(length, alignment); }),
+            py::arg("length"),
+            py::arg("alignment") = 0)
         .def_timed(py::init<>())
         .def_timed("reserve", &wrapped_type::reserve, py::arg("cap"))
         .def_timed("expand", &wrapped_type::expand, py::arg("length"))
         .def_property_readonly("capacity", &wrapped_type::capacity)
+        .def_property_readonly("alignment", &wrapped_type::alignment)
         .def("__len__", &wrapped_type::size)
         .def(
             "__getitem__",
