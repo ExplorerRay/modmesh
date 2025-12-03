@@ -24,6 +24,9 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Force fail CI
+        run: exit 1
+
       - uses: actions/checkout@v1
         with:
           fetch-depth: 1
@@ -300,6 +303,8 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Force fail CI
+        run: exit 1
 
       - uses: actions/checkout@v1
         with:
@@ -497,6 +502,8 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Force fail CI
+        run: exit 1
 
       - uses: actions/checkout@v3
         with:
@@ -650,14 +657,13 @@ jobs:
     if: ${{ failure() }}
     steps:
       - name: Send mail
-        if: failure()
         uses: dawidd6/action-send-mail@v6
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: ${{ github.job }} job of ${{ github.repository }} has ${{ job.status }}
+          subject: ${{ github.job }} job of ${{ github.repository }} has ${{ job.status }} (TEST)
           body: ${{ github.job }} job in worflow ${{ github.workflow }} of ${{ github.repository }} has ${{ job.status }}
           to: solvcon@googlegroups.com
           from: solvcon_notification
