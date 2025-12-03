@@ -654,16 +654,29 @@ jobs:
     name: Send_emails_when_CI_fails
     needs: [standalone_buffer, build_ubuntu, build_macos, build_windows]
     runs-on: ubuntu-latest
-    if: ${{ failure() }}
+    # Run if any of the dependencies failed
+    if: ${{ always() && contains(needs.*.result, 'failure') }}
     steps:
-      - name: Send mail
+      - name: Send mail to mailing list
         uses: dawidd6/action-send-mail@v6
         with:
           server_address: smtp.gmail.com
           server_port: 465
           username: ${{ secrets.EMAIL_USERNAME }}
           password: ${{ secrets.EMAIL_PASSWORD }}
-          subject: ${{ github.job }} job of ${{ github.repository }} has ${{ job.status }} (TEST)
-          body: ${{ github.job }} job in worflow ${{ github.workflow }} of ${{ github.repository }} has ${{ job.status }}
+          # Subject: Uses the Repository name
+          subject: CI Failure in ${{ github.repository }} devbuild workflow (TEST)
+          # Body: Lists the result of every job
+          body: |
+            The workflow ${{ github.workflow }} has failed.
+
+            Job Status Report:
+            ------------------
+            Standalone Buffer: ${{ needs.standalone_buffer.result }}
+            Ubuntu Build:      ${{ needs.build_ubuntu.result }}
+            MacOS Build:       ${{ needs.build_macos.result }}
+            Windows Build:     ${{ needs.build_windows.result }}
+
+            Check the logs here: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           to: solvcon@googlegroups.com
           from: solvcon_notification
