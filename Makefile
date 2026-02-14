@@ -181,7 +181,7 @@ cinclude: $(CFFILES)
 
 .PHONY: flake8
 flake8:
-	cmake --build $(BUILD_PATH) --target $@
+	cmake --build . --target $@
 
 .PHONY: checkascii
 checkascii:
