@@ -4,7 +4,7 @@ description: Setup lint dependencies for modmesh (Qt, pybind11, clang-tidy, etc.
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
       with:
         fetch-depth: 1
 
@@ -12,6 +12,7 @@ runs:
     - name: Add 8G swap (Ubuntu)
       # Prevent hitting runner's resource limits when running clang-tidy
       if: runner.os == 'Linux'
+      shell: bash
       run: |
         # Remove /swapfile first to avoid "fallocate: Text file busy" error
         sudo swapoff -a
@@ -34,6 +35,7 @@ runs:
 
     - name: dependency by apt (Ubuntu)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
         # To update the cmake version > 4, install the latest cmake by kitware apt repository.
         # Reference: https://apt.kitware.com/
@@ -79,6 +81,7 @@ runs:
 
     - name: install and configure gcc-14 (Ubuntu)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test -y
         sudo apt-get -qqy update
@@ -102,17 +105,20 @@ runs:
 
     - name: dependency by pip (Ubuntu)
       if: runner.os == 'Linux'
+      shell: bash
       run: |
         sudo pip3 install setuptools
         sudo pip3 install numpy matplotlib pytest flake8 jsonschema pyside6==$(qmake6 -query QT_VERSION)
 
     - name: dependency (manual for Ubuntu)
       if: runner.os == 'Linux'
+      shell: bash
       run: sudo ${GITHUB_WORKSPACE}/contrib/dependency/install.sh pybind11
 
     # MacOS
     - name: dependency by homebrew
       if: runner.os == 'macOS'
+      shell: bash
       run: |
         export HOMEBREW_NO_AUTO_UPDATE=1
         export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
@@ -137,6 +143,7 @@ runs:
 
     - name: dependency by pip
       if: runner.os == 'macOS'
+      shell: bash
       run: |
         echo "which python3: $(which python3)"
         ls -al $(which python3)
@@ -149,10 +156,12 @@ runs:
 
     - name: dependency (manual for MacOS)
       if: runner.os == 'macOS'
+      shell: bash
       run: sudo NO_INSTALL_PREFIX=1 ${GITHUB_WORKSPACE}/contrib/dependency/install.sh pybind11
 
     # COMMON for all OSes
     - name: show dependency
+      shell: bash
       # Copy the commands from contrib/dependency/showdep.sh
       run: |
         echo "gcc path: $(which gcc)"
