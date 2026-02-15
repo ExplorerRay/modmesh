@@ -76,7 +76,7 @@ target_compile_options(
 )
 
 if(CLANG_TIDY_EXE AND USE_CLANG_TIDY)
-    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-header-filter=/cpp/binary/pilot/.*")
+    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-header-filter=/cpp/modmesh/python/.*")
     set_target_properties(
         pilot PROPERTIES
         CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
