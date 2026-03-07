@@ -142,6 +142,7 @@ endif () # BUILD_QT
 set_target_properties(modmesh_primary PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 if (CLANG_TIDY_EXE AND USE_CLANG_TIDY)
+    set(DO_CLANG_TIDY "${CLANG_TIDY_EXE}" "-header-filter=/cpp/modmesh/.*")
     set_target_properties(
         modmesh_primary PROPERTIES
         CXX_CLANG_TIDY "${DO_CLANG_TIDY}"
