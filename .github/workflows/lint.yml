@@ -1,5 +1,8 @@
 name: lint
 
+env:
+  MERGED_TO_MASTER: ${{ (github.ref_name == 'master' && github.event.repository.fork == false) && 'true' || 'false' }}
+
 on:
   push:
   pull_request:
@@ -73,7 +76,7 @@ jobs:
 
     - uses: actions/checkout@v1
       with:
-        fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
+        fetch-depth: ${{ env.MERGED_TO_MASTER == 'true' && 1 || 0 }}
 
     - name: event name
       run: |
@@ -217,14 +220,14 @@ jobs:
       run: make checktws
 
     - name: Run clang-tidy-diff only for changed files when making PR or in a fork
-      if: ${{ github.event_name == 'pull_request' || github.event.repository.fork == true }}
+      if: ${{ env.MERGED_TO_MASTER == 'false' }}
       env:
         BASE_SHA: ${{ github.event.pull_request.base.sha }}
       run: |
         git diff -U0 $BASE_SHA...HEAD | clang-tidy-diff -p1
 
     - name: make run_pilot_pytest for clang-tidy all files when merging to master branch or on schedule
-      if: github.event_name != 'pull_request'
+      if: ${{ env.MERGED_TO_MASTER == 'true' || github.event_name == 'schedule' }}
       run: |
         export LD_LIBRARY_PATH=$(python3 -c "import sys, os, shiboken6; sys.stdout.write(os.path.dirname(shiboken6.__file__))")
         make run_pilot_pytest \
