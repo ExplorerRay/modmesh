@@ -82,6 +82,7 @@ runs:
         sudo apt-get -qqy update
         sudo apt-get -qy install clang-tidy-21 silversearcher-ag
         sudo ln -fs "$(which clang-tidy-21)" "/usr/local/bin/clang-tidy"
+        sudo ln -fs "$(which clang-tidy-diff-21.py)" "/usr/local/bin/clang-tidy-diff"
 
     - name: Install and configure gcc-14
       shell: bash

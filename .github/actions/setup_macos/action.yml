@@ -33,6 +33,7 @@ runs:
         # Ref: https://github.com/actions/runner-images/blob/main/images/macos/macos-26-Readme.md
         ln -sf "$(brew --prefix llvm@21)/bin/clang-format" "/usr/local/bin/clang-format"
         ln -sf "$(brew --prefix llvm@21)/bin/clang-tidy" "/usr/local/bin/clang-tidy"
+        ln -sf "$(brew --prefix llvm@21)/share/clang/clang-tidy-diff.py" "/usr/local/bin/clang-tidy-diff"
         rm -f /usr/local/bin/clang /usr/local/bin/clang++
 
     - name: install qt
