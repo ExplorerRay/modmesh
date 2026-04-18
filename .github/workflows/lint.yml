@@ -141,7 +141,8 @@ jobs:
           BASE_SHA="${{ github.event.before }}"
         fi
 
-        OUTPUT=$(git diff -U0 "${BASE_SHA}...HEAD" | clang-tidy-diff -p1)
+        BUILD_PATH=$(make -s print-build-path CMAKE_BUILD_TYPE=${{ matrix.cmake_build_type }})
+        OUTPUT=$(git diff -U0 "${BASE_SHA}...HEAD" | clang-tidy-diff -p1 -path "${BUILD_PATH}")
         echo "$OUTPUT"
 
     - name: make run_pilot_pytest for clang-tidy all files when merging to master branch or on schedule

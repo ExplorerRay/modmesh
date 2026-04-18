@@ -76,6 +76,10 @@ default: buildext
 .PHONY: cmake
 cmake: $(BUILD_PATH)/Makefile
 
+.PHONY: print-build-path
+print-build-path:
+	@echo $(BUILD_PATH)
+
 .PHONY: xcode
 xcode: $(BUILD_PATH)_xcode/Makefile
 
