@@ -33,13 +33,16 @@
 # ```
 #
 # Also make a symbolic link for Claude Code: `ln -s contrib/prompt/CLAUDE.md`
+#
+# Additional information.  The following commands speed up key repeat:
+# ```
+# defaults write -g InitialKeyRepeat -float 10.0 # normal minimum is 15 (225 ms)
+# defaults write -g KeyRepeat -float 1.0 # normal minimum is 2 (30 ms)
+# ```
 
 set -euo pipefail
 
-WORKSPACE_REPO="https://github.com/yungyuc/workspace"
-MODMESH_REPO="git@github.com:yaagent/modmesh.git"
 MWORK_DIR="${HOME}/mwork"
-MODMESH_DIR="${MWORK_DIR}/modmesh"
 
 log() { printf '\n==> %s\n' "$*"; }
 warn() { printf '\n!!  %s\n' "$*" >&2; }
@@ -49,14 +52,6 @@ require_macos() {
         warn "This script is intended for macOS only."
         exit 1
     fi
-}
-
-step_keyboard() {
-    log "Setting key repeat faster (require re-login)"
-    # normal minimum is 15 (225 ms)
-    defaults write -g InitialKeyRepeat -float 10.0
-    # normal minimum is 2 (30 ms)
-    defaults write -g KeyRepeat -float 1.0
 }
 
 step_shell() {
@@ -82,8 +77,14 @@ step_cli_tools() {
         xcode-select --install || true
         echo "A GUI dialog should appear. Complete the installation, then re-run this script."
         echo "Waiting for installation to finish..."
+        local waited=0
         until xcode-select -p >/dev/null 2>&1; do
             sleep 10
+            waited=$((waited + 10))
+            if (( waited >= 1800 )); then
+                warn "Timed out waiting for Command Line Tools install."
+                exit 1
+            fi
         done
     fi
 }
@@ -103,6 +104,7 @@ step_homebrew() {
     elif [[ -x /usr/local/bin/brew ]]; then
         eval "$(/usr/local/bin/brew shellenv)"
     fi
+    command -v brew >/dev/null || { warn "brew not on PATH after install"; exit 1; }
 }
 
 step_dependency() {
@@ -113,6 +115,9 @@ step_dependency() {
         pytest flake8 black
 
     log "Installing extra Python packages"
+    # We do not use venv, so just install without respecting PEP-668. It's OK
+    # for a VM for automation, but may not be a good idea for a setup for
+    # everyday work.
     pip3 install jsonschema pyyaml --break-system-packages
 }
 
@@ -126,7 +131,6 @@ step_claude() {
 }
 
 run_all() {
-    step_keyboard
     step_shell
     step_workspace
     step_cli_tools
@@ -141,7 +145,6 @@ main() {
     local target="${1:-all}"
     case "${target}" in
         all) run_all ;;
-        keyboard) step_keyboard ;;
         shell) step_shell ;;
         workspace) step_workspace ;;
         cli-tools) step_cli_tools ;;
@@ -150,7 +153,7 @@ main() {
         claude) step_claude ;;
         *)
             warn "Unknown step: ${target}"
-            echo "Valid: all, keyboard, shell, workspace, cli-tools, homebrew, dependency, claude"
+            echo "Valid: all, shell, workspace, cli-tools, homebrew, dependency, claude"
             exit 2
             ;;
     esac
