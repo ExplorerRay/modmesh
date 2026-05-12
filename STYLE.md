@@ -1,7 +1,7 @@
 # Coding Style Guide
 
 A code style guideline is to help developers align how they write and change
-code. The consistency reduces the cost to  maintain and develop the code, and
+code. The consistency reduces the cost to maintain and develop the code, and
 the former matters more than the latter, because the former costs more than the
 latter.
 
@@ -13,9 +13,9 @@ style when adding new code and changing existing code. The rules of thumb are:
 1. The linters must be clean. Before creating and updating a
    [pull request](https://docs.github.com/en/pull-requests/), run:
 
-```bash
-make lint
-```
+   ```bash
+   make lint
+   ```
 
 2. Read the code nearby and follow the style. Start from the functions and
    classes that the code resides in. Then get familiar with the style in the
@@ -217,11 +217,9 @@ from . import core
 from . import _base_app
 ```
 
-
 > **Note:**
 >
 > `modmesh` can be shorthanded as `mm`.
-
 
 Do not import module content (classes, functions, or constants) directly.
 Always use the `foo.bar` pattern to access classes, functions, or constants:
@@ -262,7 +260,6 @@ fig = figure.Figure()
 line = _base_app.QuantityLine(...)
 ```
 
-
 > **Note:**
 >
 > **Exception for Qt (PySide6):** Qt classes may be imported directly because
@@ -276,7 +273,6 @@ line = _base_app.QuantityLine(...)
 > from PySide6.QtCore import QTimer, Slot, Qt
 > from PySide6.QtWidgets import QDockWidget, QWidget
 > ```
-
 
 Use relative import for peer modules in the same package:
 
@@ -342,7 +338,7 @@ If possible, provide references to literature or documents in comments.
 
 The inclusion guard uses `#pragma once` in the first line before everything.
 
-Always use path-first inclusion (angle branket). Do not use current-first
+Always use path-first inclusion (angle bracket). Do not use current-first
 (double quote).
 
 ```cpp
@@ -357,12 +353,12 @@ Always use path-first inclusion (angle branket). Do not use current-first
 Put everything in the `modmesh` namespace.
 
 Never `using namespace` outside a local scope (like a function). Another
-namepsace is not a local scope and should not `using namespace`. When
+namespace is not a local scope and should not `using namespace`. When
 accessing something in a namespace (e.g., `modmesh`) from outside, spell
 out the full name:
 
 ```cpp
-// An anonymouse namespace
+// An anonymous namespace
 namespace
 {
 

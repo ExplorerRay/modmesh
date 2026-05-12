@@ -17,7 +17,7 @@ developed by using C++ and Python to provide:
    and analysis.
 
 An experimental Windows binary (portable) can be downloaded from the [devbuild
-Github
+GitHub
 Action](https://github.com/solvcon/modmesh/actions/workflows/devbuild.yml?query=event%3Aschedule+is%3Asuccess+branch%3Amaster).
 Click the Windows release run and scroll down to the "artifacts" section to
 download the zip file (login to [GitHub](https://github.com/) is required).  A
