@@ -38,11 +38,14 @@
 #include <modmesh/toggle/RadixTree.hpp>
 
 #include <algorithm>
+#include <array>
 #include <concepts>
 #include <format>
 #include <functional>
 #include <limits>
+#include <mdspan>
 #include <numeric>
+#include <span>
 #include <stdexcept>
 
 #ifdef _MSC_VER
@@ -1945,6 +1948,35 @@ public:
     value_type const * vptr(Args... args) const { return m_body + buffer_offset(m_stride, args...); }
     template <typename... Args>
     value_type * vptr(Args... args) { return m_body + buffer_offset(m_stride, args...); }
+
+    std::span<value_type> as_span() { return std::span<value_type>(data(), size()); }
+    std::span<value_type const> as_span() const { return std::span<value_type const>(data(), size()); }
+
+    template <size_t N>
+    std::mdspan<value_type, std::dextents<size_t, N>> as_mdspan()
+    {
+        if (ndim() != N)
+        {
+            throw std::out_of_range(
+                std::format("SimpleArray::as_mdspan: rank {} does not match ndim() {}", N, ndim()));
+        }
+        std::array<size_t, N> exts;
+        for (size_t i = 0; i < N; ++i) { exts[i] = shape(i); }
+        return std::mdspan<value_type, std::dextents<size_t, N>>(data(), exts);
+    }
+
+    template <size_t N>
+    std::mdspan<value_type const, std::dextents<size_t, N>> as_mdspan() const
+    {
+        if (ndim() != N)
+        {
+            throw std::out_of_range(
+                std::format("SimpleArray::as_mdspan: rank {} does not match ndim() {}", N, ndim()));
+        }
+        std::array<size_t, N> exts;
+        for (size_t i = 0; i < N; ++i) { exts[i] = shape(i); }
+        return std::mdspan<value_type const, std::dextents<size_t, N>>(data(), exts);
+    }
 
     /* Backdoor */
     value_type const & data(size_t it) const { return data()[it]; }
