@@ -233,6 +233,14 @@ jobs:
       fail-fast: false
 
     steps:
+      - name: Failure when job timeout cancelled
+        uses: gacts/run-and-post-run@v1
+        with:
+          post: |-
+            if [ "${{ job.status }}" == "cancelled" ]; then \
+              echo "::error::CI job timed out! Forcing failure."; \
+              exit 2; \
+            fi
 
       - uses: actions/checkout@v6
         with:

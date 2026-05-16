@@ -9,6 +9,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Failure when job timeout cancelled
+      uses: gacts/run-and-post-run@v1
+      with:
+        post: |-
+          if [ "${{ job.status }}" == "cancelled" ]; then \
+            echo "::error::CI job timed out! Forcing failure."; \
+            exit 2; \
+          fi
+
     - name: Add 12G swap
       # Prevent hitting runner's resource limits when running clang-tidy
       shell: bash
