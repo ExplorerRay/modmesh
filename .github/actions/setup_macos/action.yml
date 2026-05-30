@@ -9,6 +9,15 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Failure when job cancelled
+      uses: gacts/run-and-post-run@v1
+      with:
+        post: |-
+          if [ "${{ job.status }}" == "cancelled" ]; then \
+            echo "::error::CI job timed out! Forcing failure."; \
+            exit 2; \
+          fi
+
     - name: Creates /usr/local/include for macos runner
       shell: bash
       run: |
